@@ -278,7 +278,7 @@ function hitTestGrid(e, w, h) {
   };
 }
 
-function applyGridPoint(posIdx, massIdx, ctx, w, h, showTooltip, mx, my) {
+function applyGridPoint(posIdx, massIdx, ctx, w, h) {
   const pad = gridPadding;
   const plotW = w - pad.left - pad.right;
   const plotH = h - pad.top - pad.bottom;
@@ -288,27 +288,6 @@ function applyGridPoint(posIdx, massIdx, ctx, w, h, showTooltip, mx, my) {
   const sw = swGrid[massIdx][posIdx];
   const bal = balGrid[massIdx][posIdx];
   const wt = weightGrid[massIdx][posIdx];
-
-  // Tooltip
-  const tooltip = document.getElementById('grid-tooltip');
-  if (showTooltip && mx !== undefined) {
-    tooltip.style.display = 'block';
-    let ttX = mx + 16, ttY = my - 10;
-    if (ttX + 220 > w) ttX = mx - 230;
-    if (ttY < 0) ttY = 10;
-    tooltip.style.left = ttX + 'px';
-    tooltip.style.top = ttY + 'px';
-    tooltip.innerHTML = `
-      <div class="tt-row"><span class="tt-label">Position</span><span class="tt-value">${position.toFixed(1)} cm</span></div>
-      <div class="tt-row"><span class="tt-label">Lead Mass</span><span class="tt-value">${mass.toFixed(1)} g</span></div>
-      <hr style="border:none;border-top:1px solid rgba(255,255,255,0.08);margin:4px 0">
-      <div class="tt-row"><span class="tt-label">Weight</span><span class="tt-value">${wt.toFixed(1)} g</span></div>
-      <div class="tt-row"><span class="tt-label">Swingweight</span><span class="tt-value">${sw.toFixed(1)} kg·cm²</span></div>
-      <div class="tt-row"><span class="tt-label">Balance</span><span class="tt-value">${bal.toFixed(1)} cm</span></div>
-    `;
-  } else {
-    tooltip.style.display = 'none';
-  }
 
   // Draw crosshair
   drawGrid(ctx, w, h);
@@ -351,14 +330,14 @@ function handleGridHover(e, ctx, w, h) {
   if (!hit) {
     // Outside grid — restore pin or clear
     if (pinnedPoint) {
-      applyGridPoint(pinnedPoint.posIdx, pinnedPoint.massIdx, ctx, w, h, false);
+      applyGridPoint(pinnedPoint.posIdx, pinnedPoint.massIdx, ctx, w, h);
     } else {
       handleGridLeave();
     }
     return;
   }
   // Preview on hover (overrides pin visually)
-  applyGridPoint(hit.posIdx, hit.massIdx, ctx, w, h, true, hit.mx, hit.my);
+  applyGridPoint(hit.posIdx, hit.massIdx, ctx, w, h);
 }
 
 function handleGridClick(e, ctx, w, h) {
@@ -375,20 +354,19 @@ function handleGridClick(e, ctx, w, h) {
     handleGridLeave();
   } else {
     pinnedPoint = { posIdx: hit.posIdx, massIdx: hit.massIdx };
-    applyGridPoint(hit.posIdx, hit.massIdx, ctx, w, h, true, hit.mx, hit.my);
+    applyGridPoint(hit.posIdx, hit.massIdx, ctx, w, h);
   }
 }
 
 function handleGridLeave() {
   if (pinnedPoint) {
-    // Restore pinned point (no tooltip on leave)
+    // Restore pinned point
     if (canvasReady && cachedCtx) {
-      applyGridPoint(pinnedPoint.posIdx, pinnedPoint.massIdx, cachedCtx, cachedW, cachedH, false);
+      applyGridPoint(pinnedPoint.posIdx, pinnedPoint.massIdx, cachedCtx, cachedW, cachedH);
     }
     return;
   }
 
-  document.getElementById('grid-tooltip').style.display = 'none';
   document.getElementById('readout-bar').classList.remove('visible');
 
   // Remove markers from 3D plots
