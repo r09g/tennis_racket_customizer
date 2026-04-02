@@ -253,7 +253,7 @@ function initCanvases() {
       const canvas = document.getElementById(`mc-${idx}`);
       const dpr = window.devicePixelRatio || 1;
       const rect = wrapper.getBoundingClientRect();
-      const w = rect.width, h = Math.min(w * 0.5, 360);
+      const w = rect.width, h = Math.min(w * 0.42, 380);
       canvas.width = w * dpr; canvas.height = h * dpr;
       canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
       const ctx = canvas.getContext('2d');
