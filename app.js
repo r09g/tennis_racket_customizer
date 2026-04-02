@@ -40,6 +40,9 @@ let cachedCtx = null;
 let cachedW = 0;
 let cachedH = 0;
 
+// Pinned point state
+let pinnedPoint = null; // { posIdx, massIdx }
+
 // Throttle state for 3D markers
 let lastMarkerUpdate = 0;
 const MARKER_THROTTLE_MS = 50;
@@ -117,6 +120,8 @@ function initCanvas() {
   // Mouse events
   canvas.onmousemove = (e) => handleGridHover(e, ctx, w, h);
   canvas.onmouseleave = () => handleGridLeave();
+  canvas.onclick = (e) => handleGridClick(e, ctx, w, h);
+  canvas.style.cursor = 'crosshair';
 }
 
 function getColorForValue(val, min, max) {
@@ -255,26 +260,28 @@ function updateLegend(min, max) {
   document.getElementById('legend-title').textContent = titleMap[colorMode] || '';
 }
 
-function handleGridHover(e, ctx, w, h) {
+function hitTestGrid(e, w, h) {
   const canvas = document.getElementById('grid-canvas');
   const rect = canvas.getBoundingClientRect();
   const mx = e.clientX - rect.left;
   const my = e.clientY - rect.top;
-
   const pad = gridPadding;
   const plotW = w - pad.left - pad.right;
   const plotH = h - pad.top - pad.bottom;
-
   const relX = (mx - pad.left) / plotW;
   const relY = 1 - (my - pad.top) / plotH;
+  if (relX < 0 || relX > 1 || relY < 0 || relY > 1) return null;
+  return {
+    posIdx: Math.min(Math.floor(relX * POSITION_STEPS), POSITION_STEPS - 1),
+    massIdx: Math.min(Math.floor(relY * MASS_STEPS), MASS_STEPS - 1),
+    mx, my,
+  };
+}
 
-  if (relX < 0 || relX > 1 || relY < 0 || relY > 1) {
-    handleGridLeave();
-    return;
-  }
-
-  const posIdx = Math.min(Math.floor(relX * POSITION_STEPS), POSITION_STEPS - 1);
-  const massIdx = Math.min(Math.floor(relY * MASS_STEPS), MASS_STEPS - 1);
+function applyGridPoint(posIdx, massIdx, ctx, w, h, showTooltip, mx, my) {
+  const pad = gridPadding;
+  const plotW = w - pad.left - pad.right;
+  const plotH = h - pad.top - pad.bottom;
 
   const position = positionAxis[posIdx];
   const mass = massAxis[massIdx];
@@ -282,26 +289,26 @@ function handleGridHover(e, ctx, w, h) {
   const bal = balGrid[massIdx][posIdx];
   const wt = weightGrid[massIdx][posIdx];
 
-  // Show tooltip
+  // Tooltip
   const tooltip = document.getElementById('grid-tooltip');
-  tooltip.style.display = 'block';
-
-  let ttX = mx + 16;
-  let ttY = my - 10;
-  if (ttX + 220 > w) ttX = mx - 230;
-  if (ttY < 0) ttY = 10;
-
-  tooltip.style.left = ttX + 'px';
-  tooltip.style.top = ttY + 'px';
-
-  tooltip.innerHTML = `
-    <div class="tt-row"><span class="tt-label">Position</span><span class="tt-value">${position.toFixed(1)} cm</span></div>
-    <div class="tt-row"><span class="tt-label">Lead Mass</span><span class="tt-value">${mass.toFixed(1)} g</span></div>
-    <hr style="border:none;border-top:1px solid rgba(255,255,255,0.08);margin:4px 0">
-    <div class="tt-row"><span class="tt-label">Weight</span><span class="tt-value">${wt.toFixed(1)} g</span></div>
-    <div class="tt-row"><span class="tt-label">Swingweight</span><span class="tt-value">${sw.toFixed(1)} kg·cm²</span></div>
-    <div class="tt-row"><span class="tt-label">Balance</span><span class="tt-value">${bal.toFixed(1)} cm</span></div>
-  `;
+  if (showTooltip && mx !== undefined) {
+    tooltip.style.display = 'block';
+    let ttX = mx + 16, ttY = my - 10;
+    if (ttX + 220 > w) ttX = mx - 230;
+    if (ttY < 0) ttY = 10;
+    tooltip.style.left = ttX + 'px';
+    tooltip.style.top = ttY + 'px';
+    tooltip.innerHTML = `
+      <div class="tt-row"><span class="tt-label">Position</span><span class="tt-value">${position.toFixed(1)} cm</span></div>
+      <div class="tt-row"><span class="tt-label">Lead Mass</span><span class="tt-value">${mass.toFixed(1)} g</span></div>
+      <hr style="border:none;border-top:1px solid rgba(255,255,255,0.08);margin:4px 0">
+      <div class="tt-row"><span class="tt-label">Weight</span><span class="tt-value">${wt.toFixed(1)} g</span></div>
+      <div class="tt-row"><span class="tt-label">Swingweight</span><span class="tt-value">${sw.toFixed(1)} kg·cm²</span></div>
+      <div class="tt-row"><span class="tt-label">Balance</span><span class="tt-value">${bal.toFixed(1)} cm</span></div>
+    `;
+  } else {
+    tooltip.style.display = 'none';
+  }
 
   // Draw crosshair
   drawGrid(ctx, w, h);
@@ -325,15 +332,13 @@ function handleGridHover(e, ctx, w, h) {
   ctx.arc(cx, cy, 5, 0, Math.PI * 2);
   ctx.fillStyle = '#1a1a2e';
   ctx.fill();
-  ctx.strokeStyle = 'rgba(16,185,129,0.8)';;
+  ctx.strokeStyle = 'rgba(16,185,129,0.8)';
   ctx.lineWidth = 2;
   ctx.stroke();
   ctx.restore();
 
-  // Update readout bar
+  // Update readout & 3D markers
   showReadout(mass, position, wt, sw, bal);
-
-  // Throttled 3D plot marker update
   const now = Date.now();
   if (now - lastMarkerUpdate > MARKER_THROTTLE_MS) {
     lastMarkerUpdate = now;
@@ -341,7 +346,48 @@ function handleGridHover(e, ctx, w, h) {
   }
 }
 
+function handleGridHover(e, ctx, w, h) {
+  const hit = hitTestGrid(e, w, h);
+  if (!hit) {
+    // Outside grid — restore pin or clear
+    if (pinnedPoint) {
+      applyGridPoint(pinnedPoint.posIdx, pinnedPoint.massIdx, ctx, w, h, false);
+    } else {
+      handleGridLeave();
+    }
+    return;
+  }
+  // Preview on hover (overrides pin visually)
+  applyGridPoint(hit.posIdx, hit.massIdx, ctx, w, h, true, hit.mx, hit.my);
+}
+
+function handleGridClick(e, ctx, w, h) {
+  const hit = hitTestGrid(e, w, h);
+  if (!hit) {
+    // Click outside grid — clear pin
+    pinnedPoint = null;
+    handleGridLeave();
+    return;
+  }
+  // Toggle pin: if clicking the same cell, unpin; otherwise pin new cell
+  if (pinnedPoint && pinnedPoint.posIdx === hit.posIdx && pinnedPoint.massIdx === hit.massIdx) {
+    pinnedPoint = null;
+    handleGridLeave();
+  } else {
+    pinnedPoint = { posIdx: hit.posIdx, massIdx: hit.massIdx };
+    applyGridPoint(hit.posIdx, hit.massIdx, ctx, w, h, true, hit.mx, hit.my);
+  }
+}
+
 function handleGridLeave() {
+  if (pinnedPoint) {
+    // Restore pinned point (no tooltip on leave)
+    if (canvasReady && cachedCtx) {
+      applyGridPoint(pinnedPoint.posIdx, pinnedPoint.massIdx, cachedCtx, cachedW, cachedH, false);
+    }
+    return;
+  }
+
   document.getElementById('grid-tooltip').style.display = 'none';
   document.getElementById('readout-bar').classList.remove('visible');
 
@@ -507,10 +553,10 @@ function update3DMarkers(mass, position, sw, bal) {
     y: [mass],
     z: null,
     marker: {
-      size: 7,
-      color: '#fff',
-      symbol: 'circle',
-      line: { color: '#10b981', width: 2 },
+      size: 8,
+      color: '#ef4444',
+      symbol: 'diamond',
+      line: { color: '#fff', width: 2 },
     },
     hoverinfo: 'skip',
     showlegend: false,
