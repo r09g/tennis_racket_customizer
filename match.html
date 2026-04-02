@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Racket Matcher — Tennis Racket Customization</title>
+  <meta name="description" content="Match multiple tennis rackets to identical specs by computing the intersection of their customization surfaces.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
+</head>
+<body>
+  <div class="app-container">
+    <header class="app-header">
+      <div class="header-content">
+        <div class="logo-area">
+          <div class="logo-icon">
+            <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+              <ellipse cx="16" cy="10" rx="8" ry="10" stroke="url(#grad1)" stroke-width="2" fill="none"/>
+              <line x1="16" y1="20" x2="16" y2="31" stroke="url(#grad1)" stroke-width="2.5" stroke-linecap="round"/>
+              <defs><linearGradient id="grad1" x1="0" y1="0" x2="32" y2="32"><stop offset="0%" stop-color="#10b981"/><stop offset="100%" stop-color="#3b82f6"/></linearGradient></defs>
+            </svg>
+          </div>
+          <div>
+            <h1>Racket Matcher</h1>
+            <p class="subtitle">Match multiple rackets to identical specs via customization surface intersection</p>
+          </div>
+        </div>
+        <nav class="top-nav">
+          <a href="index.html" class="nav-link"><span class="nav-icon">◈</span> Customizer</a>
+          <a href="match.html" class="nav-link active"><span class="nav-icon">⧉</span> Racket Matcher</a>
+        </nav>
+      </div>
+    </header>
+
+    <section class="info-banner">
+      <div class="info-icon">ℹ</div>
+      <div class="info-text">
+        <strong>How it works:</strong> Each racket's lead tape options define a surface in spec space. 
+        The <em>intersection</em> of all surfaces — highlighted below — shows configurations where every racket reaches the same weight, balance, and swingweight. 
+        Hover within the highlighted region to explore matched configurations across all rackets.
+      </div>
+    </section>
+
+    <!-- Racket Input Cards -->
+    <section class="rackets-panel" id="rackets-panel">
+      <div class="section-header">
+        <h2>Racket Specs</h2>
+        <p class="section-desc">Add up to 4 rackets with their unmodified (stock) specifications</p>
+      </div>
+      <div class="rackets-grid" id="rackets-grid"></div>
+      <button class="btn-add-racket" id="btn-add-racket" onclick="addRacket()">
+        <span class="btn-add-icon">+</span> Add Racket
+      </button>
+    </section>
+
+    <!-- Settings -->
+    <section class="settings-panel" id="settings-panel">
+      <div class="settings-row">
+        <div class="input-group">
+          <label for="input-max-lead">Max Lead Per Racket</label>
+          <div class="input-wrapper">
+            <input type="number" id="input-max-lead" value="20" min="1" max="50" step="1">
+            <span class="input-unit">g</span>
+          </div>
+        </div>
+        <div class="input-group">
+          <label for="input-tol-sw">SW Tolerance</label>
+          <div class="input-wrapper">
+            <input type="number" id="input-tol-sw" value="0.5" min="0.1" max="3" step="0.1">
+            <span class="input-unit">kg·cm²</span>
+          </div>
+        </div>
+        <div class="input-group">
+          <label for="input-tol-bal">Balance Tolerance</label>
+          <div class="input-wrapper">
+            <input type="number" id="input-tol-bal" value="0.05" min="0.01" max="1" step="0.01">
+            <span class="input-unit">cm</span>
+          </div>
+        </div>
+        <button class="btn-compute" id="btn-match" onclick="runMatch()">
+          <span class="btn-icon">⚡</span> Match Rackets
+        </button>
+      </div>
+    </section>
+
+    <!-- Results (hidden until match) -->
+    <section class="results-section" id="results-section" style="display:none;">
+
+      <!-- Color mode toggle -->
+      <div class="grid-controls match-grid-controls">
+        <label class="grid-control-label">Color by:</label>
+        <div class="toggle-group" id="match-color-toggle">
+          <button class="toggle-btn active" data-mode="swingweight" onclick="setMatchColorMode('swingweight')">Swingweight</button>
+          <button class="toggle-btn" data-mode="balance" onclick="setMatchColorMode('balance')">Balance</button>
+          <button class="toggle-btn" data-mode="weight" onclick="setMatchColorMode('weight')">Weight</button>
+        </div>
+        <span class="match-region-label" id="match-region-label"></span>
+      </div>
+
+      <!-- Per-racket 2D grids -->
+      <div class="match-grids-container" id="match-grids-container"></div>
+
+      <!-- Curve intersection plot (updates on hover) -->
+      <div class="match-plot-section">
+        <div class="section-header">
+          <h2>Customization Curves at Hovered Weight</h2>
+          <p class="section-desc">Each curve shows achievable (Balance, SW) pairs for one racket. Star = current hover match point.</p>
+        </div>
+        <div class="plot-card match-plot-card">
+          <div class="plot-container match-plot-container" id="plot-curves"></div>
+        </div>
+      </div>
+
+      <!-- Per-racket 3D surfaces -->
+      <div class="match-plot-section">
+        <div class="section-header">
+          <h2>Per-Racket Swingweight Surfaces</h2>
+          <p class="section-desc">3D surfaces with the matched configuration highlighted</p>
+        </div>
+        <div class="per-racket-plots" id="per-racket-plots"></div>
+      </div>
+    </section>
+
+    <!-- Readout bar -->
+    <div class="readout-bar match-readout" id="match-readout-bar">
+      <div class="readout-item">
+        <span class="readout-label">Target Weight</span>
+        <span class="readout-value" id="match-readout-weight">—</span>
+      </div>
+      <div class="readout-divider"></div>
+      <div class="readout-item">
+        <span class="readout-label">Target Balance</span>
+        <span class="readout-value" id="match-readout-balance">—</span>
+      </div>
+      <div class="readout-divider"></div>
+      <div class="readout-item">
+        <span class="readout-label">Target SW</span>
+        <span class="readout-value" id="match-readout-sw">—</span>
+      </div>
+      <div class="readout-divider"></div>
+      <div class="readout-item" id="match-readout-rackets-container">
+        <span class="readout-rackets" id="match-readout-rackets"></span>
+      </div>
+    </div>
+
+    <footer class="app-footer">
+      <p>Formulas based on classical mechanics — moment of inertia & center of mass. RDC pivot at 10 cm from butt. Racket length 68.58 cm.</p>
+    </footer>
+  </div>
+  <script src="match.js"></script>
+</body>
+</html>
