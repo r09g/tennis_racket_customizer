@@ -114,13 +114,22 @@
         </div>
       </div>
 
-      <!-- Per-racket 3D surfaces -->
+      <!-- Combined 3D Surfaces -->
       <div class="match-plot-section">
         <div class="section-header">
-          <h2>Per-Racket Swingweight Surfaces</h2>
-          <p class="section-desc">3D surfaces with the matched configuration highlighted</p>
+          <h2>3D Customization Surfaces</h2>
+          <p class="section-desc">All rackets overlaid. Matched region shown as gold markers. Selected point highlighted dynamically.</p>
         </div>
-        <div class="per-racket-plots" id="per-racket-plots"></div>
+        <div class="plots-row">
+          <div class="plot-card">
+            <div class="plot-header"><h3>Swingweight Surfaces</h3><p>SW(mass, position) for all rackets</p></div>
+            <div class="plot-container" id="srfc-sw" style="height:420px"></div>
+          </div>
+          <div class="plot-card">
+            <div class="plot-header"><h3>Balance Surfaces</h3><p>Balance(mass, position) for all rackets</p></div>
+            <div class="plot-container" id="srfc-bal" style="height:420px"></div>
+          </div>
+        </div>
       </div>
     </section>
 

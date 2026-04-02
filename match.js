@@ -367,6 +367,7 @@ function applyPoint(rIdx, mIdx, pIdx) {
   drawCrosshairs(configs);
   showReadout(configs, tW, tB, tSW);
   updateCurvePlot(tW, configs);
+  update3DMarkers(configs);
 }
 
 function hitTest(rIdx, e) {
@@ -409,6 +410,7 @@ function handleClick(rIdx, e) {
     // Clicked outside matched region → clear pin
     pinnedPoint = null;
     clearCrosshairs(); hideReadout();
+    clear3DMarkers();
     renderInitialCurvePlot();
     return;
   }
@@ -421,7 +423,7 @@ function handleLeave() {
   if (pinnedPoint) {
     applyPoint(pinnedPoint.rIdx, pinnedPoint.mIdx, pinnedPoint.pIdx);
   } else {
-    clearCrosshairs(); hideReadout();
+    clearCrosshairs(); hideReadout(); clear3DMarkers();
   }
 }
 
@@ -539,80 +541,138 @@ function renderInitialCurvePlot() {
   }, { responsive: true, displaylogo: false });
 }
 
-// ── Per-Racket 3D Surface Plots ────────────────────────
+// ── Combined 3D Surface Plots ──────────────────────────
+let surfaceTraceCount = { sw: 0, bal: 0 }; // track how many static traces exist
+
 function render3DSurfaces() {
-  const cont = document.getElementById('per-racket-plots');
-  cont.innerHTML = '';
+  const pS = 50, mS = 40;
+  const pos = [], mas = [];
+  for (let i = 0; i < pS; i++) pos.push((i / (pS - 1)) * RACKET_LENGTH);
+  for (let j = 0; j < mS; j++) mas.push((j / (mS - 1)) * maxLead);
+
+  const swTraces = [], balTraces = [];
 
   rackets.forEach((r, rIdx) => {
     const c = RACKET_COLORS[rIdx];
-    const card = document.createElement('div');
-    card.className = 'plot-card per-racket-card';
-    card.style.borderColor = c.main + '20';
-    card.innerHTML = `
-      <div class="plot-header">
-        <div style="display:flex;align-items:center;gap:8px">
-          <div class="racket-color-dot" style="background:${c.main}"></div>
-          <h3>Racket ${rIdx + 1} — SW Surface</h3>
-        </div>
-        <p>Matched region shown as gold markers</p>
-      </div>
-      <div class="plot-container" id="srfc-${rIdx}"></div>`;
-    cont.appendChild(card);
-
-    const pS = 50, mS = 40;
-    const pos = [], mas = [], sg = [];
-    for (let i = 0; i < pS; i++) pos.push((i / (pS - 1)) * RACKET_LENGTH);
-    for (let j = 0; j < mS; j++) mas.push((j / (mS - 1)) * maxLead);
+    const sg = [], bg = [];
     for (let j = 0; j < mS; j++) {
-      const row = [];
-      for (let i = 0; i < pS; i++) row.push(calcSW(r.sw, mas[j], pos[i]));
-      sg.push(row);
+      const sr = [], br = [];
+      for (let i = 0; i < pS; i++) {
+        sr.push(calcSW(r.sw, mas[j], pos[i]));
+        br.push(calcBalance(r.weight, r.balance, mas[j], pos[i]));
+      }
+      sg.push(sr); bg.push(br);
     }
 
-    const traces = [{
+    // SW surface
+    swTraces.push({
       type: 'surface', x: pos, y: mas, z: sg,
-      colorscale: [[0, c.main + '44'], [0.5, c.main + '88'], [1, c.main]],
-      opacity: 0.7, showscale: false, name: `R${rIdx + 1}`,
+      colorscale: [[0, c.main + '55'], [0.5, c.main + 'aa'], [1, c.main]],
+      opacity: 0.92, showscale: false, name: `R${rIdx + 1}`,
       contours: { z: { show: true, usecolormap: true, highlightcolor: '#fff', project: { z: false } } },
       hovertemplate: `R${rIdx + 1}<br>Pos: %{x:.1f}cm<br>Mass: %{y:.1f}g<br>SW: %{z:.1f}<extra></extra>`,
-    }];
+    });
 
-    // Collect matched points for this racket from mask
+    // Balance surface
+    balTraces.push({
+      type: 'surface', x: pos, y: mas, z: bg,
+      colorscale: [[0, c.main + '55'], [0.5, c.main + 'aa'], [1, c.main]],
+      opacity: 0.92, showscale: false, name: `R${rIdx + 1}`,
+      contours: { z: { show: true, usecolormap: true, highlightcolor: '#fff', project: { z: false } } },
+      hovertemplate: `R${rIdx + 1}<br>Pos: %{x:.1f}cm<br>Mass: %{y:.1f}g<br>Bal: %{z:.2f}cm<extra></extra>`,
+    });
+
+    // Matched region markers
     if (matchComputed) {
-      const mx = [], my = [], mz = [];
       const rd = racketData[rIdx];
+      const mxs = [], mys = [], mzs = [], mxb = [], myb = [], mzb = [];
       for (let j = 0; j < MASS_STEPS; j += 2) for (let i = 0; i < POS_STEPS; i += 2) {
         if (matchedMask[rIdx][j][i]) {
-          mx.push(rd.posAxis[i]); my.push(rd.massAxis[j]); mz.push(rd.swGrid[j][i]);
+          mxs.push(rd.posAxis[i]); mys.push(rd.massAxis[j]); mzs.push(rd.swGrid[j][i]);
+          mxb.push(rd.posAxis[i]); myb.push(rd.massAxis[j]); mzb.push(rd.balGrid[j][i]);
         }
       }
-      if (mx.length) {
-        traces.push({
-          type: 'scatter3d', mode: 'markers', x: mx, y: my, z: mz,
-          marker: { size: 3, color: '#fbbf24', opacity: 0.8 },
-          name: 'Matched', showlegend: true,
-          hovertemplate: 'Matched<br>Pos: %{x:.1f}cm<br>Mass: %{y:.1f}g<br>SW: %{z:.1f}<extra></extra>',
+      if (mxs.length) {
+        swTraces.push({
+          type: 'scatter3d', mode: 'markers', x: mxs, y: mys, z: mzs,
+          marker: { size: 2.5, color: '#f59e0b', opacity: 0.7 },
+          name: `R${rIdx + 1} matched`, showlegend: false,
+          hovertemplate: `R${rIdx + 1} matched<br>Pos: %{x:.1f}cm<br>Mass: %{y:.1f}g<br>SW: %{z:.1f}<extra></extra>`,
+        });
+        balTraces.push({
+          type: 'scatter3d', mode: 'markers', x: mxb, y: myb, z: mzb,
+          marker: { size: 2.5, color: '#f59e0b', opacity: 0.7 },
+          name: `R${rIdx + 1} matched`, showlegend: false,
+          hovertemplate: `R${rIdx + 1} matched<br>Pos: %{x:.1f}cm<br>Mass: %{y:.1f}g<br>Bal: %{z:.2f}cm<extra></extra>`,
         });
       }
     }
-
-    const layout = {
-      paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
-      margin: { l: 0, r: 0, t: 10, b: 0 },
-      scene: {
-        xaxis: { title: { text: 'Position (cm)', font: { size: 10, color: '#6b7280' } }, gridcolor: 'rgba(0,0,0,0.06)', color: '#6b7280', tickfont: { size: 9, family: 'JetBrains Mono', color: '#9ca3af' }, backgroundcolor: 'rgba(0,0,0,0)' },
-        yaxis: { title: { text: 'Mass (g)', font: { size: 10, color: '#6b7280' } }, gridcolor: 'rgba(0,0,0,0.06)', color: '#6b7280', tickfont: { size: 9, family: 'JetBrains Mono', color: '#9ca3af' }, backgroundcolor: 'rgba(0,0,0,0)' },
-        zaxis: { title: { text: 'SW', font: { size: 10, color: '#6b7280' } }, gridcolor: 'rgba(0,0,0,0.06)', color: '#6b7280', tickfont: { size: 9, family: 'JetBrains Mono', color: '#9ca3af' }, backgroundcolor: 'rgba(0,0,0,0)' },
-        bgcolor: 'rgba(255,255,255,0.0)', camera: { eye: { x: 1.8, y: -1.6, z: 1.0 } },
-      },
-      font: { family: 'Inter', color: '#6b7280' },
-      legend: { font: { size: 10, color: '#6b7280' }, bgcolor: 'rgba(255,255,255,0.9)' },
-    };
-    setTimeout(() => Plotly.newPlot(`srfc-${rIdx}`, traces, layout, {
-      responsive: true, displaylogo: false, modeBarButtonsToRemove: ['toImage', 'resetCameraLastSave3d'],
-    }), rIdx * 100);
   });
+
+  surfaceTraceCount.sw = swTraces.length;
+  surfaceTraceCount.bal = balTraces.length;
+
+  const makeLayout = (zTitle) => ({
+    paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+    margin: { l: 0, r: 0, t: 10, b: 0 },
+    scene: {
+      xaxis: { title: { text: 'Position (cm)', font: { size: 10, color: '#6b7280' } }, gridcolor: 'rgba(0,0,0,0.06)', color: '#6b7280', tickfont: { size: 9, family: 'JetBrains Mono', color: '#9ca3af' }, backgroundcolor: 'rgba(0,0,0,0)' },
+      yaxis: { title: { text: 'Mass (g)', font: { size: 10, color: '#6b7280' } }, gridcolor: 'rgba(0,0,0,0.06)', color: '#6b7280', tickfont: { size: 9, family: 'JetBrains Mono', color: '#9ca3af' }, backgroundcolor: 'rgba(0,0,0,0)' },
+      zaxis: { title: { text: zTitle, font: { size: 10, color: '#6b7280' } }, gridcolor: 'rgba(0,0,0,0.06)', color: '#6b7280', tickfont: { size: 9, family: 'JetBrains Mono', color: '#9ca3af' }, backgroundcolor: 'rgba(0,0,0,0)' },
+      bgcolor: 'rgba(255,255,255,0.0)', camera: { eye: { x: 1.8, y: -1.6, z: 1.0 } },
+    },
+    font: { family: 'Inter', color: '#6b7280' },
+    legend: { font: { size: 10, color: '#6b7280' }, bgcolor: 'rgba(255,255,255,0.9)' },
+  });
+
+  const cfg = { responsive: true, displaylogo: false, modeBarButtonsToRemove: ['toImage', 'resetCameraLastSave3d'] };
+
+  Plotly.newPlot('srfc-sw', swTraces, makeLayout('SW (kg·cm²)'), cfg);
+  setTimeout(() => Plotly.newPlot('srfc-bal', balTraces, makeLayout('Balance (cm)'), cfg), 100);
+}
+
+// ── Dynamic 3D Markers (hover/click) ───────────────────
+function update3DMarkers(configs) {
+  // Build per-racket markers for SW and Balance plots
+  const swMarkerTraces = [], balMarkerTraces = [];
+
+  for (const c of configs) {
+    const col = RACKET_COLORS[c.k];
+    swMarkerTraces.push({
+      type: 'scatter3d', mode: 'markers', x: [c.pos], y: [c.mass], z: [c.sw],
+      marker: { size: 8, color: col.main, symbol: 'diamond', line: { color: '#fff', width: 2 } },
+      name: `R${c.k + 1} sel`, showlegend: false, hoverinfo: 'skip',
+    });
+    balMarkerTraces.push({
+      type: 'scatter3d', mode: 'markers', x: [c.pos], y: [c.mass], z: [c.b],
+      marker: { size: 8, color: col.main, symbol: 'diamond', line: { color: '#fff', width: 2 } },
+      name: `R${c.k + 1} sel`, showlegend: false, hoverinfo: 'skip',
+    });
+  }
+
+  // Remove old markers then add new ones
+  const swEl = document.getElementById('srfc-sw');
+  const balEl = document.getElementById('srfc-bal');
+  if (!swEl || !swEl.data) return;
+
+  // Trim to only static traces
+  while (swEl.data.length > surfaceTraceCount.sw) Plotly.deleteTraces('srfc-sw', -1);
+  while (balEl.data.length > surfaceTraceCount.bal) Plotly.deleteTraces('srfc-bal', -1);
+
+  // Add new marker traces
+  Plotly.addTraces('srfc-sw', swMarkerTraces);
+  Plotly.addTraces('srfc-bal', balMarkerTraces);
+}
+
+function clear3DMarkers() {
+  const swEl = document.getElementById('srfc-sw');
+  const balEl = document.getElementById('srfc-bal');
+  if (swEl && swEl.data) {
+    while (swEl.data.length > surfaceTraceCount.sw) Plotly.deleteTraces('srfc-sw', -1);
+  }
+  if (balEl && balEl.data) {
+    while (balEl.data.length > surfaceTraceCount.bal) Plotly.deleteTraces('srfc-bal', -1);
+  }
 }
 
 // ── Main ───────────────────────────────────────────────
