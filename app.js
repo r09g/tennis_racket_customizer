@@ -39,6 +39,7 @@ let gridPadding = { top: 30, right: 20, bottom: 50, left: 60 };
 let cachedCtx = null;
 let cachedW = 0;
 let cachedH = 0;
+let gridHoverTimer = null;
 
 // Pinned point state
 let pinnedPoint = null; // { posIdx, massIdx }
@@ -118,9 +119,18 @@ function initCanvas() {
   drawGrid(ctx, w, h);
 
   // Mouse events
-  canvas.onmousemove = (e) => handleGridHover(e, ctx, w, h);
-  canvas.onmouseleave = () => handleGridLeave();
-  canvas.onclick = (e) => handleGridClick(e, ctx, w, h);
+  canvas.onmousemove = (e) => {
+    clearTimeout(gridHoverTimer);
+    gridHoverTimer = setTimeout(() => handleGridHover(e, ctx, w, h), 50);
+  };
+  canvas.onmouseleave = () => {
+    clearTimeout(gridHoverTimer);
+    handleGridLeave();
+  };
+  canvas.onclick = (e) => {
+    clearTimeout(gridHoverTimer);
+    handleGridClick(e, ctx, w, h);
+  };
   canvas.style.cursor = 'crosshair';
 }
 

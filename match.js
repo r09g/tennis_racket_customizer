@@ -260,9 +260,18 @@ function initCanvases() {
       ctx.scale(dpr, dpr);
       canvasStates[idx] = { ctx, w, h, canvas };
       drawGrid(idx);
-      canvas.onmousemove = (e) => handleHover(idx, e);
-      canvas.onmouseleave = () => handleLeave();
-      canvas.onclick = (e) => handleClick(idx, e);
+      canvas.onmousemove = (e) => {
+        clearTimeout(canvasStates[idx].hoverTimer);
+        canvasStates[idx].hoverTimer = setTimeout(() => handleHover(idx, e), 50);
+      };
+      canvas.onmouseleave = () => {
+        clearTimeout(canvasStates[idx].hoverTimer);
+        handleLeave();
+      };
+      canvas.onclick = (e) => {
+        clearTimeout(canvasStates[idx].hoverTimer);
+        handleClick(idx, e);
+      };
     });
   });
 }
@@ -332,7 +341,6 @@ function drawAxes(ctx, w, h) {
 }
 
 // ── Hover / Click ──────────────────────────────────────
-let hoverThrottle = 0;
 
 function resolvePoint(rIdx, mIdx, pIdx) {
   const r = rackets[rIdx], d = racketData[rIdx];
@@ -385,10 +393,6 @@ function hitTest(rIdx, e) {
 }
 
 function handleHover(rIdx, e) {
-  const now = Date.now();
-  if (now - hoverThrottle < 30) return;
-  hoverThrottle = now;
-
   const hit = hitTest(rIdx, e);
   if (!hit) {
     // If pinned, restore pinned point visuals
