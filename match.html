@@ -1,31 +1,38 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Racket Matcher — Tennis Racket Customization</title>
-  <meta name="description" content="Match multiple tennis rackets to identical specs by computing the intersection of their customization surfaces.">
-  <meta name="keywords" content="tennis, racket, match, matcher, customization, lead tape, swingweight, balance, intersection, calculator">
-  <meta name="author" content="rhyang">
+  <meta name="description"
+    content="Match multiple tennis rackets to identical specs by computing the intersection of their customization surfaces.">
+  <meta name="keywords"
+    content="tennis, racket, match, matcher, customization, lead tape, swingweight, balance, intersection, calculator">
+  <meta name="author" content="Raymond Yang">
 
   <!-- Open Graph Meta Tags -->
   <meta property="og:title" content="Racket Matcher — Tennis Racket Customization">
-  <meta property="og:description" content="Match multiple tennis rackets to identical specs by computing the intersection of their customization surfaces.">
+  <meta property="og:description"
+    content="Match multiple tennis rackets to identical specs by computing the intersection of their customization surfaces.">
   <meta property="og:type" content="website">
 
   <!-- Twitter Meta Tags -->
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="Racket Matcher — Tennis Racket Customization">
-  <meta name="twitter:description" content="Match multiple tennis rackets to identical specs by computing the intersection of their customization surfaces.">
-  
+  <meta name="twitter:description"
+    content="Match multiple tennis rackets to identical specs by computing the intersection of their customization surfaces.">
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet">
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
-  <script data-goatcounter="https://rhyang.goatcounter.com/count"
-        async src="//gc.zgo.at/count.js"></script>
+  <script data-goatcounter="https://rhyang.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 </head>
+
 <body>
   <div class="app-container">
     <header class="app-header">
@@ -33,9 +40,14 @@
         <div class="logo-area">
           <div class="logo-icon">
             <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-              <ellipse cx="16" cy="10" rx="8" ry="10" stroke="url(#grad1)" stroke-width="2" fill="none"/>
-              <line x1="16" y1="20" x2="16" y2="31" stroke="url(#grad1)" stroke-width="2.5" stroke-linecap="round"/>
-              <defs><linearGradient id="grad1" x1="0" y1="0" x2="32" y2="32"><stop offset="0%" stop-color="#10b981"/><stop offset="100%" stop-color="#3b82f6"/></linearGradient></defs>
+              <ellipse cx="16" cy="10" rx="8" ry="10" stroke="url(#grad1)" stroke-width="2" fill="none" />
+              <line x1="16" y1="20" x2="16" y2="31" stroke="url(#grad1)" stroke-width="2.5" stroke-linecap="round" />
+              <defs>
+                <linearGradient id="grad1" x1="0" y1="0" x2="32" y2="32">
+                  <stop offset="0%" stop-color="#10b981" />
+                  <stop offset="100%" stop-color="#3b82f6" />
+                </linearGradient>
+              </defs>
             </svg>
           </div>
           <div>
@@ -53,8 +65,9 @@
     <section class="info-banner">
       <div class="info-icon">ℹ</div>
       <div class="info-text">
-        <strong>How it works:</strong> Each racket's lead tape options define a surface in spec space. 
-        The <em>intersection</em> of all surfaces — highlighted below — shows configurations where every racket reaches the same weight, balance, and swingweight. 
+        <strong>How it works:</strong> Each racket's lead tape options define a surface in spec space.
+        The <em>intersection</em> of all surfaces — highlighted below — shows configurations where every racket reaches
+        the same weight, balance, and swingweight.
         Hover within the highlighted region to explore matched configurations across all rackets.
       </div>
     </section>
@@ -108,7 +121,8 @@
       <div class="grid-controls match-grid-controls">
         <label class="grid-control-label">Color by:</label>
         <div class="toggle-group" id="match-color-toggle">
-          <button class="toggle-btn active" data-mode="swingweight" onclick="setMatchColorMode('swingweight')">Swingweight</button>
+          <button class="toggle-btn active" data-mode="swingweight"
+            onclick="setMatchColorMode('swingweight')">Swingweight</button>
           <button class="toggle-btn" data-mode="balance" onclick="setMatchColorMode('balance')">Balance</button>
           <button class="toggle-btn" data-mode="weight" onclick="setMatchColorMode('weight')">Weight</button>
         </div>
@@ -122,7 +136,8 @@
       <div class="match-plot-section">
         <div class="section-header">
           <h2>Customization Curves at Hovered Weight</h2>
-          <p class="section-desc">Each curve shows achievable (Balance, SW) pairs for one racket. Star = current hover match point.</p>
+          <p class="section-desc">Each curve shows achievable (Balance, SW) pairs for one racket. Star = current hover
+            match point.</p>
         </div>
         <div class="plot-card match-plot-card">
           <div class="plot-container match-plot-container" id="plot-curves"></div>
@@ -133,15 +148,22 @@
       <div class="match-plot-section">
         <div class="section-header">
           <h2>3D Customization Surfaces</h2>
-          <p class="section-desc">All rackets overlaid. Matched region shown as gold markers. Selected point highlighted dynamically.</p>
+          <p class="section-desc">All rackets overlaid. Matched region shown as gold markers. Selected point highlighted
+            dynamically.</p>
         </div>
         <div class="plots-row">
           <div class="plot-card">
-            <div class="plot-header"><h3>Swingweight Surfaces</h3><p>SW(mass, position) for all rackets</p></div>
+            <div class="plot-header">
+              <h3>Swingweight Surfaces</h3>
+              <p>SW(mass, position) for all rackets</p>
+            </div>
             <div class="plot-container" id="srfc-sw" style="height:420px"></div>
           </div>
           <div class="plot-card">
-            <div class="plot-header"><h3>Balance Surfaces</h3><p>Balance(mass, position) for all rackets</p></div>
+            <div class="plot-header">
+              <h3>Balance Surfaces</h3>
+              <p>Balance(mass, position) for all rackets</p>
+            </div>
             <div class="plot-container" id="srfc-bal" style="height:420px"></div>
           </div>
         </div>
@@ -171,9 +193,11 @@
     </div>
 
     <footer class="app-footer">
-      <p>Formulas based on classical mechanics — moment of inertia & center of mass. RDC pivot at 10 cm from butt. Racket length 68.58 cm.</p>
+      <p>Formulas based on classical mechanics — moment of inertia & center of mass. RDC pivot at 10 cm from butt.
+        Racket length 68.58 cm.</p>
     </footer>
   </div>
   <script src="match.js"></script>
 </body>
+
 </html>
